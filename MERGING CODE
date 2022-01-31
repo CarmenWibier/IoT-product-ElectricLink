@@ -1,0 +1,111 @@
+// MERGED EXISTING CODE FOR LED, BOT CONNECTION AND BOT MESSAGE
+
+#include <ESP8266WiFi.h>
+#include <WiFiClientSecure.h>
+#include <UniversalTelegramBot.h>
+#include <ArduinoJson.h>
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+ #include <avr/power.h> 
+#endif
+
+#define PIN        D5 
+
+// How many NeoPixels are attached to the Arduino?
+#define NUMPIXELS 12 
+
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+
+#define DELAYVAL 500 
+
+// Replace with your network credentials
+const char* ssid = "AndroidAP1129";
+const char* password = "12345678";
+
+// Initialize Telegram BOT
+#define BOTtoken "5089019270:AAEIcvhWkJo0N8hOi4-U_yiX23E-C0fey-M"  // your Bot Token (Get from Botfather)
+
+// Use @myidbot to find out the chat ID of an individual or a group
+// Also note that you need to click "start" on a bot before it can
+// message you
+#define CHAT_ID "5091260394"
+
+X509List cert(TELEGRAM_CERTIFICATE_ROOT);
+WiFiClientSecure client;
+UniversalTelegramBot bot(BOTtoken, client);
+
+const unsigned long BOT_MTBS = 1000;
+unsigned long bot_lasttime;
+
+void handleNewMessages(int numNewMessages)
+{
+  for (int i = 0; i < numNewMessages; i++)
+  {
+    bot.sendMessage(bot.messages[i].chat_id, bot.messages[i].text, "");
+  }
+} 
+
+void setup() {
+  Serial.begin(115200);
+   Serial.println();
+  configTime(0, 0, "pool.ntp.org");      // get UTC time via NTP
+  client.setTrustAnchors(&cert); // Add root certificate for api.telegram.org
+  
+#if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
+  clock_prescale_set(clock_div_1);
+#endif
+  // END of Trinket-specific code.
+
+  pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
+
+  // Attempt to connect to Wifi network:
+  Serial.print("Connecting Wifi: ");
+  Serial.println(ssid);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  bot.sendMessage(CHAT_ID, "Bot started up", "test");
+}
+
+void loop() { 
+
+  if (millis() - bot_lasttime > BOT_MTBS)
+  {
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+
+    while (numNewMessages)
+    {
+      Serial.println("got response");
+      handleNewMessages(numNewMessages);
+      numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    }
+
+    bot_lasttime = millis();
+  }
+  
+  pixels.clear(); // Set all pixel colors to 'off'
+
+  // The first NeoPixel in a strand is #0, second is 1, all the way up
+  // to the count of pixels minus one.
+  for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
+
+    // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
+    // Here we're using a moderately bright green color:
+    pixels.setPixelColor(i, pixels.Color(0, 150, 0));
+
+    pixels.show();   // Send the updated pixel colors to the hardware.
+
+    delay(DELAYVAL); // Pause before next pass through loop
+    }
+  }
